@@ -7,3 +7,8 @@ function.*
 test.py
 *.log
 test.json
+venv
+
+
+# Caching DB
+*.db

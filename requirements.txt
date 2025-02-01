@@ -6,3 +6,7 @@ gunicorn
 mangum
 requests
 uvicorn[standard]
+sqlalchemy
+alembic
+opentelemetry-api
+opentelemetry-sdk
