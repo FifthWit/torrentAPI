@@ -14,6 +14,33 @@ from helper.uptime import getUptime
 from mangum import Mangum
 from math import ceil
 import time
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.exporter.prometheus import PrometheusMetricReader
+from prometheus_client import start_http_server
+
+resource = Resource(attributes={
+    "service.name": "Torrent-Api-Py"
+})
+
+trace.set_tracer_provider(TracerProvider(resource=resource))
+tracer_provider = trace.get_tracer_provider()
+
+otlp_exporter = OTLPSpanExporter(endpoint="tempo-collector:4317", insecure=True)
+span_processor = BatchSpanProcessor(otlp_exporter)
+tracer_provider.add_span_processor(span_processor)
+
+start_http_server(port=8000, addr="0.0.0.0")
+prometheus_reader = PrometheusMetricReader()
+meter_provider = MeterProvider(resource=resource, metric_readers=[prometheus_reader])
+
+def init_telemetry(app):
+    FastAPIInstrumentor.instrument_app(app)
 
 startTime = time.time()
 
@@ -29,6 +56,8 @@ app = FastAPI(
     },
 )
 
+init_telemetry(app)
+
 origins = ["*"]
 
 app.add_middleware(
@@ -39,12 +68,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 @app.get("/health")
 async def health_route(req: Request):
     """
     Health Route : Returns App details.
-
     """
     return JSONResponse(
         {
@@ -54,7 +81,6 @@ async def health_route(req: Request):
             "uptime": ceil(getUptime(startTime)),
         }
     )
-
 
 app.include_router(search_router, prefix="/api/v1/search")
 app.include_router(trending_router, prefix="/api/v1/trending")
